@@ -1,0 +1,79 @@
+PUT _ingest/pipeline/unifi-network-logs
+{
+  "description": "Pipeline to parse Unifi network logs",
+  "processors": [
+    {
+      "rename": {
+        "field": "message",
+        "target_field": "event.original",
+        "ignore_missing": true
+      }
+    },
+    {
+      "grok": {
+        "field": "event.original",
+        "patterns": [
+          "\\[%{DATA:unifi.rule_id}\\]\\s+DESCR=\"%{DATA:unifi.description}\"\\s+IN=%{DATA:unifi.interface_in}\\s+OUT=%{DATA:unifi.interface_out}?\\s+MAC=%{DATA:unifi.mac_address}\\s+SRC=%{IP:unifi.source_ip}\\s+DST=%{IP:unifi.destination_ip}\\s+LEN=%{NUMBER:unifi.length:int}\\s+TOS=%{DATA:unifi.tos}\\s+PREC=%{DATA:unifi.precedence}\\s+TTL=%{NUMBER:unifi.ttl:int}\\s+ID=%{NUMBER:unifi.packet_id:int}\\s+(?:%{WORD:unifi.fragment_flag}\\s+)?PROTO=%{WORD:unifi.protocol}\\s+SPT=%{NUMBER:unifi.source_port:int}\\s+DPT=%{NUMBER:unifi.destination_port:int}\\s+SEQ=%{NUMBER:unifi.sequence_number:long}\\s+ACK=%{NUMBER:unifi.ack_number:long}\\s+WINDOW=%{NUMBER:unifi.window_size:int}\\s+(?:%{WORD:unifi.tcp_flags}\\s+)*URGP=%{NUMBER:unifi.urgent_pointer:int}\\s+UID=%{NUMBER:unifi.uid:int}\\s+GID=%{NUMBER:unifi.gid:int}\\s+MARK=%{DATA:unifi.mark}"
+        ]
+      }
+    },
+    {
+      "split": {
+        "field": "unifi.tcp_flags",
+        "separator": "\\s+"
+      }
+    },
+    {
+      "set": {
+        "field": "unifi.rule_id",
+        "value": "{{{unifi.rule_id}}}",
+        "ignore_failure": true
+      }
+    },
+    {
+      "trim": {
+        "field": "unifi.mac_address"
+      }
+    },
+    {
+      "date": {
+        "field": "@timestamp",
+        "formats": [
+          "ISO8601"
+        ],
+        "ignore_failure": true
+      }
+    },
+    {
+      "set": {
+        "field": "event.kind",
+        "value": "event"
+      }
+    },
+    {
+      "set": {
+        "field": "event.category",
+        "value": "network"
+      }
+    },
+    {
+      "set": {
+        "field": "event.type",
+        "value": "connection"
+      }
+    },
+    {
+      "pipeline": {
+        "name": "drop syslog levels 5 or higher"
+      }
+    }
+  ],
+  "on_failure": [
+    {
+      "set": {
+        "field": "error.message",
+        "value": "{{ _ingest.on_failure_message }}"
+      }
+    }
+  ]
+}
